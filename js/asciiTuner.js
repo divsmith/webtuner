@@ -23,11 +23,18 @@ const IN_TUNE_CENTS  = 3;
 const SHAPE_SCALE    = 3;
 
 // Ring wave parameters
-const RING_SPEED          = 0.4;   // cells per frame
-const RING_EMIT_INTERVAL  = 3;     // frames between new rings
-const RING_MAX_RADIUS     = 40;    // max travel distance
-const RING_DECAY          = 0.025; // brightness lost per cell of travel
-const DENSITY_FADE        = 0.88;  // global density multiplier per frame
+const RING_SPEED          = 0.35;  // cells per frame
+const RING_EMIT_INTERVAL  = 4;     // frames between new rings
+const RING_MAX_RADIUS     = 35;    // max travel distance
+const RING_WIDTH          = 3.5;   // half-width of each ring band (cells)
+const RING_DECAY          = 0.012; // brightness lost per cell of travel
+const MAX_WAVE_DENSITY    = 0.55;  // cap wave brightness well below letter body
+const DENSITY_FADE        = 0.91;  // global density multiplier per frame
+
+// Peak-hold envelope for sustained ring emission after pluck
+const PEAK_ATTACK         = 1.0;   // instant attack
+const PEAK_RELEASE        = 0.985; // slow exponential decay per frame
+let peakVolume            = 0;
 
 // ── Palette ──────────────────────────────────────────────────
 let palette = [];
@@ -148,7 +155,8 @@ let container = null;
 let cols = 0;
 let rows = 0;
 let rowEls = [];
-let density;
+let waveDensity;   // wave-only density field (never contains letter body)
+let isShapeCell;   // boolean mask: true for cells that are part of the letter
 let running = false;
 let visible = false;
 let rafId = null;
@@ -245,11 +253,21 @@ function computeShapeLayout() {
 }
 
 // ── Ring management ──────────────────────────────────────────
+function updatePeakEnvelope() {
+  if (currentVolume > peakVolume) {
+    peakVolume = currentVolume;
+  } else {
+    peakVolume *= PEAK_RELEASE;
+  }
+}
+
 function emitRing() {
-  if (!shapeMask || currentVolume < 0.005) return;
+  if (!shapeMask) return;
+  if (peakVolume < 0.002) return;
+
   rings.push({
     radius: 0,
-    brightness: Math.min(1, currentVolume * 6),
+    brightness: Math.min(MAX_WAVE_DENSITY, peakVolume * 3),
   });
 }
 
@@ -268,12 +286,13 @@ function ringsContributionAt(dist) {
   let total = 0;
   for (const ring of rings) {
     const delta = Math.abs(dist - ring.radius);
-    if (delta < 2.5) {
-      const falloff = 1 - delta / 2.5;
-      total += ring.brightness * falloff;
+    if (delta < RING_WIDTH) {
+      const falloff = 1 - delta / RING_WIDTH;
+      // Smooth falloff curve
+      total += ring.brightness * falloff * falloff;
     }
   }
-  return Math.min(1, total);
+  return Math.min(MAX_WAVE_DENSITY, total);
 }
 
 // ── Grid setup ───────────────────────────────────────────────
@@ -286,7 +305,8 @@ function initGrid() {
   cols = Math.min(MAX_COLS, Math.max(10, Math.floor(rect.width / avgCharW)));
   rows = Math.min(MAX_ROWS, Math.max(5, Math.floor(rect.height / LINE_HEIGHT)));
 
-  density = new Float32Array(cols * rows);
+  waveDensity = new Float32Array(cols * rows);
+  isShapeCell = new Uint8Array(cols * rows);
   container.innerHTML = '';
   rowEls = [];
 
@@ -300,17 +320,24 @@ function initGrid() {
 
   rings = [];
   frameCount = 0;
+  peakVolume = 0;
   computeShapeLayout();
 }
 
 // ── Simulation step ──────────────────────────────────────────
 function simulate() {
-  // Fade existing density
-  for (let i = 0; i < cols * rows; i++) {
-    density[i] *= DENSITY_FADE;
+  const n = cols * rows;
+
+  // Track volume envelope every frame
+  updatePeakEnvelope();
+
+  // Fade wave density only (letter body is handled separately)
+  for (let i = 0; i < n; i++) {
+    waveDensity[i] *= DENSITY_FADE;
   }
 
-  // Shape body: always bright
+  // Recompute shape cell mask
+  isShapeCell.fill(0);
   if (shapeMask) {
     for (let r = 0; r < shapeH; r++) {
       for (let c = 0; c < shapeW; c++) {
@@ -318,27 +345,28 @@ function simulate() {
           const gr = shapeOffsetRow + r;
           const gc = shapeOffsetCol + c;
           if (gr < rows && gc < cols) {
-            density[gr * cols + gc] = 1.0;
+            isShapeCell[gr * cols + gc] = 1;
           }
         }
       }
     }
   }
 
-  // Emit new rings periodically based on volume
+  // Emit new rings periodically
   if (frameCount % RING_EMIT_INTERVAL === 0) {
     emitRing();
   }
   stepRings();
 
-  // Apply ring contributions to density
+  // Apply ring contributions ONLY to cells outside the letter shape
   if (shapeDist && rings.length > 0) {
-    for (let i = 0; i < cols * rows; i++) {
+    for (let i = 0; i < n; i++) {
+      if (isShapeCell[i]) continue; // protect letter body
       const dist = shapeDist[i];
       if (dist > 0 && dist < RING_MAX_RADIUS) {
         const contrib = ringsContributionAt(dist);
-        if (contrib > density[i]) {
-          density[i] = contrib;
+        if (contrib > waveDensity[i]) {
+          waveDensity[i] = contrib;
         }
       }
     }
@@ -361,15 +389,25 @@ function render() {
   for (let r = 0; r < rows; r++) {
     let html = '';
     for (let c = 0; c < cols; c++) {
-      const b = density[r * cols + c];
-      if (b < 0.02) {
-        html += ' ';
-      } else {
-        const m = findBest(b, targetCellW);
-        const alpha = Math.max(0.06, Math.min(1, b));
-        const clr = colorString(color, alpha);
+      const idx = r * cols + c;
+
+      if (isShapeCell[idx]) {
+        // Letter body: always full brightness, high-weight character
+        const m = findBest(0.95, targetCellW);
+        const clr = colorString(color, 1.0);
         const cls = weightClass(m.weight, m.style);
         html += `<span class="${cls}" style="color:${clr}">${esc(m.char)}</span>`;
+      } else {
+        const b = waveDensity[idx];
+        if (b < 0.02) {
+          html += ' ';
+        } else {
+          const m = findBest(b, targetCellW);
+          const alpha = Math.max(0.08, Math.min(0.85, b));
+          const clr = colorString(color, alpha);
+          const cls = weightClass(m.weight, m.style);
+          html += `<span class="${cls}" style="color:${clr}">${esc(m.char)}</span>`;
+        }
       }
     }
     rowEls[r].innerHTML = html;
