@@ -22,6 +22,13 @@ const MAX_CENTS      = 50;
 const IN_TUNE_CENTS  = 3;
 const SHAPE_SCALE    = 3;
 
+// Letter body envelope
+const LETTER_ATTACK       = 0.055; // rise rate per frame  (~18 frames to full)
+const LETTER_RELEASE      = 0.035; // fall rate per frame  (~28 frames to fade out)
+
+// Smooth color interpolation
+const COLOR_LERP_RATE     = 0.045; // lerp rate per frame  (~22 frames to settle)
+
 // Ring wave parameters
 const RING_SPEED          = 0.35;  // cells per frame
 const RING_EMIT_INTERVAL  = 4;     // frames between new rings
@@ -157,6 +164,7 @@ let rows = 0;
 let rowEls = [];
 let waveDensity;   // wave-only density field (never contains letter body)
 let isShapeCell;   // boolean mask: true for cells that are part of the letter
+let cellPhase;     // Float32Array of per-cell random phase offsets for body animation
 let running = false;
 let visible = false;
 let rafId = null;
@@ -167,6 +175,10 @@ let currentNote   = null;
 let currentCents  = 0;
 let currentVolume = 0;
 let currentInTune = false;
+
+// ── Letter body & color animation state ──────────────────────
+let letterBodyAlpha = 0;                          // 0 = invisible, 1 = fully visible
+let displayColor    = { r: 45, g: 206, b: 114 }; // lerp'd toward getTuneColor each frame
 
 // ── Ring wave state ──────────────────────────────────────────
 let rings = [];
@@ -307,6 +319,14 @@ function initGrid() {
 
   waveDensity = new Float32Array(cols * rows);
   isShapeCell = new Uint8Array(cols * rows);
+
+  // Per-cell random phase offsets for the animated body shimmer
+  cellPhase = new Float32Array(cols * rows);
+  for (let i = 0; i < cellPhase.length; i++) {
+    cellPhase[i] = Math.random() * Math.PI * 2;
+  }
+
+  letterBodyAlpha = 0;
   container.innerHTML = '';
   rowEls = [];
 
@@ -372,6 +392,16 @@ function simulate() {
     }
   }
 
+  // Update letter body alpha envelope
+  if (currentNote && peakVolume > 0.005) {
+    letterBodyAlpha = Math.min(1.0, letterBodyAlpha + LETTER_ATTACK);
+  } else {
+    letterBodyAlpha = Math.max(0.0, letterBodyAlpha - LETTER_RELEASE);
+  }
+
+  // Smooth color interpolation toward the current tuning target
+  displayColor = lerpColor(displayColor, getTuneColor(currentCents), COLOR_LERP_RATE);
+
   frameCount++;
 }
 
@@ -383,7 +413,7 @@ function render() {
 
   simulate();
 
-  const color = getTuneColor(currentCents);
+  const color = displayColor;
   const targetCellW = container.getBoundingClientRect().width / cols;
 
   for (let r = 0; r < rows; r++) {
@@ -392,11 +422,18 @@ function render() {
       const idx = r * cols + c;
 
       if (isShapeCell[idx]) {
-        // Letter body: always full brightness, high-weight character
-        const m = findBest(0.95, targetCellW);
-        const clr = colorString(color, 1.0);
-        const cls = weightClass(m.weight, m.style);
-        html += `<span class="${cls}" style="color:${clr}">${esc(m.char)}</span>`;
+        if (letterBodyAlpha < 0.01) {
+          html += ' ';
+        } else {
+          // Animated body: each cell independently cycles brightness via a slow sine,
+          // making the letter shimmer with continuously changing ASCII characters.
+          const phase = cellPhase[idx];
+          const bodyB = 0.72 + 0.28 * Math.sin(frameCount * 0.07 + phase);
+          const m = findBest(bodyB, targetCellW);
+          const clr = colorString(color, letterBodyAlpha);
+          const cls = weightClass(m.weight, m.style);
+          html += `<span class="${cls}" style="color:${clr}">${esc(m.char)}</span>`;
+        }
       } else {
         const b = waveDensity[idx];
         if (b < 0.02) {
@@ -483,6 +520,7 @@ export function setTuningState(noteName, cents, volume, inTune) {
   currentInTune = inTune;
 
   if (noteChanged) {
+    letterBodyAlpha = 0;  // reset so the new note emerges from zero
     computeShapeLayout();
   } else if (shapeMask) {
     // Recompute horizontal offset for cents changes

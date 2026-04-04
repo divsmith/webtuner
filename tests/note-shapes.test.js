@@ -7,11 +7,11 @@ test('getShapeMask returns a valid grid for all supported letters', () => {
   for (const letter of SUPPORTED_LETTERS) {
     const shape = getShapeMask(letter);
     assert.ok(shape, `Shape for "${letter}" should exist`);
-    assert.equal(shape.width, 5);
-    assert.equal(shape.height, 7);
-    assert.equal(shape.grid.length, 7);
+    assert.equal(shape.width, 7);
+    assert.equal(shape.height, 9);
+    assert.equal(shape.grid.length, 9);
     for (const row of shape.grid) {
-      assert.equal(row.length, 5);
+      assert.equal(row.length, 7);
     }
   }
 });
@@ -19,19 +19,19 @@ test('getShapeMask returns a valid grid for all supported letters', () => {
 test('getShapeMask handles sharp notes (letter + accidental)', () => {
   const shape = getShapeMask('F#');
   assert.ok(shape);
-  // 5 (letter) + 1 (spacing) + 3 (accidental) = 9
-  assert.equal(shape.width, 9);
-  assert.equal(shape.height, 7);
+  // 7 (letter) + 1 (spacing) + 4 (accidental) = 12
+  assert.equal(shape.width, 12);
+  assert.equal(shape.height, 9);
 
   // F has top-left filled, # has middle row filled
-  assert.equal(shape.grid[0][0], 1); // F starts with #####
+  assert.equal(shape.grid[0][0], 1); // F starts with #######
 });
 
 test('getShapeMask handles flat notes', () => {
   const shape = getShapeMask('Bb');
   assert.ok(shape);
-  assert.equal(shape.width, 9);
-  assert.equal(shape.height, 7);
+  assert.equal(shape.width, 12);
+  assert.equal(shape.height, 9);
 });
 
 test('getShapeMask returns null for invalid input', () => {
@@ -43,9 +43,9 @@ test('getShapeMask returns null for invalid input', () => {
 test('scaleShape doubles dimensions at factor 2', () => {
   const shape = getShapeMask('E');
   const scaled = scaleShape(shape, 2);
-  assert.equal(scaled.width, 10);
-  assert.equal(scaled.height, 14);
-  assert.equal(scaled.grid.length, 14);
+  assert.equal(scaled.width, 14);
+  assert.equal(scaled.height, 18);
+  assert.equal(scaled.grid.length, 18);
   // Each original pixel becomes a 2×2 block
   assert.equal(scaled.grid[0][0], 1); // E top-left is filled
   assert.equal(scaled.grid[0][1], 1); // duplicated
