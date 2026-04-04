@@ -108,12 +108,14 @@ export function showInTuneBadge() {
   el.style.animation = 'none';
   el.offsetHeight; // reflow
   el.style.animation = '';
+  document.querySelector('.gauge-container')?.classList.add('in-tune');
 }
 
 export function hideInTuneBadge() {
   if (!_badgeVisible) return;
   _badgeVisible = false;
   $('in-tune-badge').classList.add('hidden');
+  document.querySelector('.gauge-container')?.classList.remove('in-tune');
 }
 
 // ── String Buttons ───────────────────────────────────────────
