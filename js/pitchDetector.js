@@ -39,6 +39,8 @@ export class PitchDetector {
     };
     /** @type {((hz: number | null) => void) | null} */
     this.onPitch   = null;
+    /** @type {((rms: number) => void) | null} */
+    this.onVolume  = null;
   }
 
   async start() {
@@ -89,6 +91,7 @@ export class PitchDetector {
     this._analyser.getFloatTimeDomainData(this._buffer);
 
     const rms = this._rms(this._buffer);
+    this.onVolume?.(rms);
     if (rms < RMS_THRESHOLD) {
       this.onPitch?.(null);
       return;

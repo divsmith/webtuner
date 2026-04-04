@@ -16,7 +16,6 @@ import {
   closeModal,
   getCustomName,
   getElement,
-  initGauge,
   initStringEditor,
   openModal,
   renderSavedTunings,
@@ -29,9 +28,14 @@ import {
   showApp,
   showError,
   showStartScreen,
-  updateNeedle,
-  updateNoteDisplay,
 } from './ui.js';
+import {
+  init as initAsciiTuner,
+  start as startAsciiTuner,
+  stop as stopAsciiTuner,
+  setTuningState,
+  destroy as destroyAsciiTuner,
+} from './asciiTuner.js';
 
 const AUTO_DETECT_FRAMES = 3;
 const MANUAL_LOCK_MS = 5000;
@@ -47,6 +51,7 @@ const state = {
   manualLockUntil: 0,
   lastFocusedElement: null,
   isStarting: false,
+  currentVolume: 0,
 };
 
 function getTuningById(id) {
@@ -69,7 +74,7 @@ function resetAutoDetectDebounce() {
 }
 
 function updateGaugeForSilence() {
-  updateNoteDisplay(null, null, null, true);
+  setTuningState(null, 0, 0, false);
   setActiveString(state.activeStringIndex, false);
 }
 
@@ -85,8 +90,7 @@ function updateGaugeForPitch(freq) {
   const noteName = parsed?.note || targetString.label.replace(/\d/g, '');
   const inTune = Math.abs(cents) <= IN_TUNE_THRESHOLD;
 
-  updateNeedle(cents);
-  updateNoteDisplay(noteName, parsed?.octave ?? null, cents, false, inTune);
+  setTuningState(noteName, cents, state.currentVolume, inTune);
   setActiveString(state.activeStringIndex, inTune);
 }
 
@@ -235,15 +239,18 @@ async function startTuner() {
 
   const detector = new PitchDetector();
   detector.onPitch = handlePitch;
+  detector.onVolume = (rms) => { state.currentVolume = rms; };
 
   try {
     await detector.start();
     state.detector = detector;
     showApp();
+    startAsciiTuner();
     updateGaugeForSilence();
   } catch (error) {
     detector.stop();
     state.detector = null;
+    stopAsciiTuner();
     const message = getStartErrorMessage(error);
     showError(message.title, message.message);
   } finally {
@@ -315,7 +322,7 @@ function bindEvents() {
 }
 
 function init() {
-  initGauge();
+  initAsciiTuner(getElement('ascii-tuner'));
   syncSelectedTuning(getLastTuningId());
   resetCustomTuningForm();
   bindEvents();

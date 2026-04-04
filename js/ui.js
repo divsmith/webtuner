@@ -1,5 +1,5 @@
 /**
- * ui.js — All DOM rendering and SVG gauge management
+ * ui.js — All DOM rendering (string buttons, tuning selector, modal, screens)
  */
 
 import {
@@ -9,114 +9,9 @@ import {
   sanitizeNoteLabel,
 } from './noteUtils.js';
 
-// ── Gauge geometry constants ─────────────────────────────────
-const CX = 160;       // SVG pivot x
-const CY = 185;       // SVG pivot y
-const R  = 140;       // arc radius
-const MAX_CENTS = 50; // ±50 cents = full deflection
-
-/** Convert cents offset → rotation angle in degrees (0° = straight up) */
-function centsToAngle(cents) {
-  return Math.max(-90, Math.min(90, (cents / MAX_CENTS) * 90));
-}
-
-/**
- * Point on the arc at angle θ (degrees, 0=up, positive=clockwise).
- * Returns { x, y } in SVG coordinates.
- */
-function arcPt(theta) {
-  const rad = theta * (Math.PI / 180);
-  return {
-    x: CX + R * Math.sin(rad),
-    y: CY - R * Math.cos(rad),
-  };
-}
-
-/**
- * Build an SVG arc path string from angle θ1 to θ2 (both "up=0°").
- * Always travels counterclockwise in screen space → over the top of the circle.
- */
-function arcPath(theta1, theta2) {
-  const p1 = arcPt(theta1);
-  const p2 = arcPt(theta2);
-  const largeArc = Math.abs(theta2 - theta1) > 180 ? 1 : 0;
-  return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${R} ${R} 0 ${largeArc} 0 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
-}
-
 // ── Cached DOM refs ──────────────────────────────────────────
 const $ = id => document.getElementById(id);
 let modalFocusTimer = null;
-
-export function initGauge() {
-  // Background track: full -90° → +90°
-  $('arc-bg').setAttribute('d', arcPath(-90, 90));
-
-  // Colored zone arcs (angle proportional to cents)
-  const a = deg => deg; // identity for clarity
-  $('arc-red-flat'    ).setAttribute('d', arcPath(a(-90), a(-36)));
-  $('arc-yellow-flat' ).setAttribute('d', arcPath(a(-36), a(-9)));
-  $('arc-green'       ).setAttribute('d', arcPath(a(-9),  a( 9)));
-  $('arc-yellow-sharp').setAttribute('d', arcPath(a( 9),  a(36)));
-  $('arc-red-sharp'   ).setAttribute('d', arcPath(a(36),  a(90)));
-}
-
-/** Rotate needle to reflect a given cents offset. */
-export function updateNeedle(cents) {
-  const angle = centsToAngle(isFinite(cents) ? cents : 0);
-  $('needle-group').style.transform = `rotate(${angle}deg)`;
-}
-
-/** Update the note name and cents readout inside the gauge. */
-export function updateNoteDisplay(noteName, octave, cents, silent, inTune = false) {
-  const noteEl  = $('gauge-note');
-  const centsEl = $('gauge-cents');
-
-  if (silent) {
-    noteEl.textContent  = '--';
-    centsEl.textContent = '';
-    updateNeedle(0);
-    hideInTuneBadge();
-    return;
-  }
-
-  noteEl.textContent = noteName ?? '--';
-
-  if (cents !== null && isFinite(cents)) {
-    const sign  = cents >= 0 ? '+' : '';
-    centsEl.textContent = `${sign}${Math.round(cents)}¢`;
-
-    if (inTune) {
-      showInTuneBadge();
-    } else {
-      hideInTuneBadge();
-    }
-  } else {
-    centsEl.textContent = '';
-    hideInTuneBadge();
-  }
-}
-
-// ── In-tune badge ────────────────────────────────────────────
-let _badgeVisible = false;
-
-export function showInTuneBadge() {
-  const el = $('in-tune-badge');
-  if (_badgeVisible) return;
-  _badgeVisible = true;
-  el.classList.remove('hidden');
-  // Restart animation each time
-  el.style.animation = 'none';
-  el.offsetHeight; // reflow
-  el.style.animation = '';
-  document.querySelector('.gauge-container')?.classList.add('in-tune');
-}
-
-export function hideInTuneBadge() {
-  if (!_badgeVisible) return;
-  _badgeVisible = false;
-  $('in-tune-badge').classList.add('hidden');
-  document.querySelector('.gauge-container')?.classList.remove('in-tune');
-}
 
 // ── String Buttons ───────────────────────────────────────────
 /**

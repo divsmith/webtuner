@@ -308,119 +308,38 @@ body {
   border-color: var(--accent);
 }
 
-/* ── Main / Gauge ───────────────────────────────────────────── */
+/* ── Main / ASCII Tuner ─────────────────────────────────────── */
 .app-main {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 12px;
+  padding: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
-.gauge-container {
-  position: relative;
+#ascii-tuner {
   width: 100%;
-  max-width: 380px;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  justify-content: center;
 }
 
-/* Ambient glow when in-tune */
-.gauge-container.in-tune::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80%;
-  height: 80%;
-  background: radial-gradient(ellipse at 50% 75%, rgba(45, 206, 114, 0.14) 0%, transparent 60%);
-  pointer-events: none;
-  animation: gauge-pulse 1.6s ease-in-out infinite;
-  z-index: 0;
+.asc-row {
+  white-space: pre;
+  overflow: hidden;
+  font-family: Georgia, Palatino, "Times New Roman", serif;
+  font-size: 14px;
 }
 
-@keyframes gauge-pulse {
-  0%, 100% { opacity: 0.5; }
-  50%       { opacity: 1;   }
-}
-
-#gauge-svg {
-  width: 100%;
-  height: auto;
-  display: block;
-  overflow: visible;
-  position: relative;
-  z-index: 1;
-}
-
-/* Override SVG arc colors via CSS */
-#arc-bg           { stroke: var(--surface-3); }
-#arc-red-flat,
-#arc-red-sharp    { stroke: var(--red); }
-#arc-yellow-flat,
-#arc-yellow-sharp { stroke: var(--yellow); }
-#arc-green        { stroke: var(--green); filter: url(#glow-green); }
-
-/* Center tick (direct child line, not the needle) */
-#gauge-svg > line { stroke: var(--accent); opacity: 0.9; }
-
-/* Needle */
-#needle-line        { stroke: var(--text); filter: url(#glow-needle); }
-#needle-group circle { fill: var(--text); }
-
-/* SVG text rendered via CSS so fonts load correctly */
-.svg-note {
-  font-family: var(--font-display);
-  font-size: 52px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  fill: var(--text);
-}
-
-.svg-cents {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  fill: var(--text-muted);
-  letter-spacing: 0.08em;
-}
-
-/* Needle smooth rotation */
-#needle-group {
-  transform-box: view-box;
-  transform-origin: 160px 185px;
-  transition: transform 80ms linear;
-}
-
-/* In-tune badge */
-.in-tune-badge {
-  position: absolute;
-  bottom: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: transparent;
-  border: 1px solid var(--green);
-  color: var(--green);
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  padding: 5px 20px;
-  border-radius: 99px;
-  white-space: nowrap;
-  box-shadow: 0 0 16px var(--green-glow), inset 0 0 8px rgba(45,206,114,0.06);
-  animation: badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  pointer-events: none;
-  z-index: 2;
-}
-
-@keyframes badge-pop {
-  from { transform: translateX(-50%) scale(0.7); opacity: 0; }
-  to   { transform: translateX(-50%) scale(1);   opacity: 1; }
-}
+.w3 { font-weight: 300; }
+.w5 { font-weight: 500; }
+.w8 { font-weight: 800; }
+.it { font-style: italic; }
 
 /* ── String Buttons ─────────────────────────────────────────── */
 .app-footer {
@@ -734,13 +653,12 @@ body {
 
 /* ── Landscape phones ───────────────────────────────────────── */
 @media (orientation: landscape) and (max-height: 500px) {
-  .app-main   { padding: 4px 12px; }
   .app-footer { padding: 6px 12px; }
-
-  .gauge-container { max-width: 260px; }
 
   .string-btn { min-height: 46px; }
   .string-btn .s-name { font-size: 1.1rem; }
+
+  .asc-row { font-size: 11px; }
 
   .start-icon { width: 56px; height: 56px; }
   .start-icon svg { width: 18px; }
