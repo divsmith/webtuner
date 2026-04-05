@@ -8,6 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="WebTuner">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <title>WebTuner — Guitar Tuner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -70,13 +72,23 @@
       </div>
     </header>
 
+    <div id="tuning-gauge"></div>
+
     <main class="app-main">
       <div id="ascii-tuner"></div>
     </main>
 
     <footer class="app-footer">
-      <div id="string-buttons" class="string-buttons" role="group" aria-label="Guitar strings">
-        <!-- Populated by ui.js -->
+      <div class="footer-row">
+        <div id="string-buttons" class="string-buttons" role="group" aria-label="Guitar strings">
+          <!-- Populated by ui.js -->
+        </div>
+        <button id="btn-ref-tone" class="btn-ref-tone" type="button"
+                aria-label="Play reference tone" title="Play reference tone">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M6 4v12l10-6z" fill="currentColor"/>
+          </svg>
+        </button>
       </div>
     </footer>
 
@@ -129,5 +141,10 @@
   </div><!-- #modal-overlay -->
 
   <script type="module" src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

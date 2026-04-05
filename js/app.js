@@ -36,6 +36,21 @@ import {
   setTuningState,
   destroy as destroyAsciiTuner,
 } from './asciiTuner.js';
+import {
+  init as initGauge,
+  update as updateGauge,
+  setActive as setGaugeActive,
+} from './gauge.js';
+import {
+  init as initReferenceTone,
+  play as playReferenceTone,
+  stop as stopReferenceTone,
+  isPlaying as isReferenceTonePlaying,
+} from './referenceTone.js';
+import {
+  request as requestWakeLock,
+  release as releaseWakeLock,
+} from './wakeLock.js';
 
 const AUTO_DETECT_FRAMES = 3;
 const MANUAL_LOCK_MS = 5000;
@@ -52,6 +67,7 @@ const state = {
   lastFocusedElement: null,
   isStarting: false,
   currentVolume: 0,
+  wasInTune: false,
 };
 
 function getTuningById(id) {
@@ -75,7 +91,9 @@ function resetAutoDetectDebounce() {
 
 function updateGaugeForSilence() {
   setTuningState(null, 0, 0, false);
+  updateGauge(0, 0);
   setActiveString(state.activeStringIndex, false);
+  state.wasInTune = false;
 }
 
 function updateGaugeForPitch(freq) {
@@ -91,7 +109,14 @@ function updateGaugeForPitch(freq) {
   const inTune = Math.abs(cents) <= IN_TUNE_THRESHOLD;
 
   setTuningState(noteName, cents, state.currentVolume, inTune);
+  updateGauge(cents, state.currentVolume);
   setActiveString(state.activeStringIndex, inTune);
+
+  // Haptic feedback on entering in-tune zone
+  if (inTune && !state.wasInTune && navigator.vibrate) {
+    navigator.vibrate(50);
+  }
+  state.wasInTune = inTune;
 }
 
 function applyAutoDetect(freq) {
@@ -126,6 +151,32 @@ function handleManualStringSelect(index) {
   state.manualLockUntil = Date.now() + MANUAL_LOCK_MS;
   resetAutoDetectDebounce();
   setActiveString(index, false);
+  // Stop reference tone when switching strings
+  if (isReferenceTonePlaying()) {
+    stopReferenceTone();
+    updateRefToneButton(false);
+  }
+}
+
+function toggleReferenceTone() {
+  if (isReferenceTonePlaying()) {
+    stopReferenceTone();
+    updateRefToneButton(false);
+    return;
+  }
+  const targetString = state.currentTuning?.strings[state.activeStringIndex];
+  if (!targetString) return;
+  playReferenceTone(targetString.freq);
+  updateRefToneButton(true);
+}
+
+function updateRefToneButton(playing) {
+  const btn = getElement('btn-ref-tone');
+  btn.classList.toggle('playing', playing);
+  btn.setAttribute('aria-label', playing ? 'Stop reference tone' : 'Play reference tone');
+  btn.innerHTML = playing
+    ? '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="5" y="4" width="4" height="12" rx="1" fill="currentColor"/><rect x="11" y="4" width="4" height="12" rx="1" fill="currentColor"/></svg>'
+    : '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 4v12l10-6z" fill="currentColor"/></svg>';
 }
 
 function syncSelectedTuning(preferredId) {
@@ -244,13 +295,18 @@ async function startTuner() {
   try {
     await detector.start();
     state.detector = detector;
+    initReferenceTone(detector.audioContext);
     showApp();
+    setGaugeActive(true);
     startAsciiTuner();
+    requestWakeLock();
     updateGaugeForSilence();
   } catch (error) {
     detector.stop();
     state.detector = null;
     stopAsciiTuner();
+    setGaugeActive(false);
+    releaseWakeLock();
     const message = getStartErrorMessage(error);
     showError(message.title, message.message);
   } finally {
@@ -265,6 +321,10 @@ function bindEvents() {
 
   getElement('tuning-select').addEventListener('change', (event) => {
     state.manualLockUntil = 0;
+    if (isReferenceTonePlaying()) {
+      stopReferenceTone();
+      updateRefToneButton(false);
+    }
     syncSelectedTuning(event.target.value);
     updateGaugeForSilence();
   });
@@ -272,6 +332,7 @@ function bindEvents() {
   getElement('btn-add-tuning').addEventListener('click', openCustomTuningModal);
   getElement('btn-save-tuning').addEventListener('click', handleSaveCustomTuning);
   getElement('btn-modal-close').addEventListener('click', closeCustomTuningModal);
+  getElement('btn-ref-tone').addEventListener('click', toggleReferenceTone);
 
   getElement('modal-overlay').addEventListener('click', (event) => {
     if (event.target === event.currentTarget) {
@@ -322,6 +383,8 @@ function bindEvents() {
 }
 
 function init() {
+  initGauge(getElement('tuning-gauge'));
+  setGaugeActive(false);
   initAsciiTuner(getElement('ascii-tuner'));
   syncSelectedTuning(getLastTuningId());
   resetCustomTuningForm();

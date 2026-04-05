@@ -43,6 +43,11 @@ export class PitchDetector {
     this.onVolume  = null;
   }
 
+  /** @returns {AudioContext|null} The underlying AudioContext, for sharing with other audio modules. */
+  get audioContext() {
+    return this._ctx;
+  }
+
   async start() {
     // Disable processing that can distort pitch
     this._stream = await navigator.mediaDevices.getUserMedia({

@@ -210,20 +210,9 @@ function computeShapeLayout() {
   shapeW = scaled.width;
   shapeH = scaled.height;
 
-  // Center the shape vertically, offset horizontally by cents
+  // Center the shape vertically
   shapeOffsetRow = Math.max(0, Math.floor((rows - shapeH) / 2));
-
-  // Horizontal: center ± cents-based offset
-  const centerCol = Math.floor((cols - shapeW) / 2);
-  const maxShift = Math.floor(cols * 0.3);
-  let centsOffset = 0;
-  if (Math.abs(currentCents) > IN_TUNE_CENTS) {
-    const sign = currentCents > 0 ? 1 : -1;
-    const magnitude = Math.min(Math.abs(currentCents), MAX_CENTS);
-    const normalized = (magnitude - IN_TUNE_CENTS) / (MAX_CENTS - IN_TUNE_CENTS);
-    centsOffset = Math.round(sign * normalized * maxShift);
-  }
-  shapeOffsetCol = Math.max(0, Math.min(cols - shapeW, centerCol + centsOffset));
+  shapeOffsetCol = Math.max(0, Math.floor((cols - shapeW) / 2));
 
   // Precompute distance field from shape boundary
   shapeDist = new Float32Array(cols * rows);
@@ -522,22 +511,6 @@ export function setTuningState(noteName, cents, volume, inTune) {
   if (noteChanged) {
     letterBodyAlpha = 0;  // reset so the new note emerges from zero
     computeShapeLayout();
-  } else if (shapeMask) {
-    // Recompute horizontal offset for cents changes
-    const centerCol = Math.floor((cols - shapeW) / 2);
-    const maxShift = Math.floor(cols * 0.3);
-    let centsOffset = 0;
-    if (Math.abs(currentCents) > IN_TUNE_CENTS) {
-      const sign = currentCents > 0 ? 1 : -1;
-      const magnitude = Math.min(Math.abs(currentCents), MAX_CENTS);
-      const normalized = (magnitude - IN_TUNE_CENTS) / (MAX_CENTS - IN_TUNE_CENTS);
-      centsOffset = Math.round(sign * normalized * maxShift);
-    }
-    const newOffset = Math.max(0, Math.min(cols - shapeW, centerCol + centsOffset));
-    if (newOffset !== shapeOffsetCol) {
-      shapeOffsetCol = newOffset;
-      computeShapeLayout();
-    }
   }
 }
 
