@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Free guitar tuner that runs in your browser. No app needed.">
+  <meta name="theme-color" content="#0d0d14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WebTuner">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>WebTuner — Guitar Tuner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "@chenglou/pretext": "https://esm.sh/@chenglou/pretext@0.0.4"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <!-- ── Start Screen ─────────────────────────────────────── -->
+  <div id="start-screen" class="screen">
+    <div class="start-inner">
+      <div class="start-icon" aria-hidden="true">
+        <svg viewBox="0 0 40 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="14" y1="6" x2="14" y2="28" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="26" y1="6" x2="26" y2="28" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M14 28 Q14 36 20 36 Q26 36 26 28" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <line x1="20" y1="36" x2="20" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1>WebTuner</h1>
+      <p class="start-tagline">Free guitar tuner — right in your browser</p>
+      <button id="btn-start" class="btn-primary" type="button">Start Tuning</button>
+      <p class="start-note">Microphone access required</p>
+    </div>
+  </div>
+
+  <!-- ── Error Screen ──────────────────────────────────────── -->
+  <div id="error-screen" class="screen hidden">
+    <div class="error-inner">
+      <div class="error-icon" aria-hidden="true">⚠️</div>
+      <h2 id="error-title">Error</h2>
+      <p id="error-msg"></p>
+      <button id="btn-retry" class="btn-secondary" type="button">Try Again</button>
+    </div>
+  </div>
+
+  <!-- ── Tuner App ─────────────────────────────────────────── -->
+  <div id="app" class="hidden">
+
+    <header class="app-header">
+      <div class="tuning-row">
+        <span class="tuning-label" aria-hidden="true">Tuning</span>
+        <div class="select-wrap">
+          <select id="tuning-select" aria-label="Select tuning"></select>
+        </div>
+        <button id="btn-add-tuning" class="btn-icon" type="button"
+                aria-label="Manage custom tunings" title="Manage custom tunings">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="tuning-gauge"></div>
+
+    <main class="app-main">
+      <div id="ascii-tuner"></div>
+    </main>
+
+    <footer class="app-footer">
+      <div class="footer-row">
+        <div id="string-buttons" class="string-buttons" role="group" aria-label="Guitar strings">
+          <!-- Populated by ui.js -->
+        </div>
+        <button id="btn-ref-tone" class="btn-ref-tone" type="button"
+                aria-label="Play reference tone" title="Play reference tone">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M6 4v12l10-6z" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+    </footer>
+
+  </div><!-- #app -->
+
+  <!-- ── Custom Tuning Modal ───────────────────────────────── -->
+  <div id="modal-overlay" class="modal-overlay hidden"
+       role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box" role="document">
+
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">Custom Tunings</h2>
+        <button id="btn-modal-close" class="btn-icon" type="button" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <path d="M3 3l12 12M15 3L3 15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Create new section -->
+        <section class="modal-section">
+          <h3 class="section-title">Create New</h3>
+          <div class="form-group">
+            <label for="custom-name" class="form-label">Name</label>
+            <input id="custom-name" type="text" class="form-input"
+                   placeholder="e.g. My Tuning" maxlength="30"
+                   autocomplete="off" spellcheck="false">
+          </div>
+          <p id="custom-tuning-error" class="form-error hidden" role="alert"></p>
+          <div class="string-editor" id="string-editor">
+            <!-- 6 rows injected by ui.js -->
+          </div>
+          <button id="btn-save-tuning" class="btn-primary btn-full" type="button">
+            Save Tuning
+          </button>
+        </section>
+
+        <!-- Saved custom tunings -->
+        <section class="modal-section" id="saved-section">
+          <h3 class="section-title">Saved</h3>
+          <div id="saved-tunings-list" class="saved-list">
+            <!-- Populated by ui.js -->
+          </div>
+        </section>
+
+      </div><!-- .modal-body -->
+    </div><!-- .modal-box -->
+  </div><!-- #modal-overlay -->
+
+  <script type="module" src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
