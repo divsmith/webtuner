@@ -30,17 +30,13 @@ import {
   showStartScreen,
 } from './ui.js';
 import {
-  init as initAsciiTuner,
-  start as startAsciiTuner,
-  stop as stopAsciiTuner,
+  init as initTunerDisplay,
+  start as startTunerDisplay,
+  stop as stopTunerDisplay,
   setTuningState,
-  destroy as destroyAsciiTuner,
-} from './asciiTuner.js';
-import {
-  init as initGauge,
-  update as updateGauge,
-  setActive as setGaugeActive,
-} from './gauge.js';
+  setActive as setTunerDisplayActive,
+  destroy as destroyTunerDisplay,
+} from './tunerDisplay.js';
 import {
   init as initReferenceTone,
   play as playReferenceTone,
@@ -91,7 +87,6 @@ function resetAutoDetectDebounce() {
 
 function updateGaugeForSilence() {
   setTuningState(null, 0, 0, false);
-  updateGauge(0, 0);
   setActiveString(state.activeStringIndex, false);
   state.wasInTune = false;
 }
@@ -109,7 +104,6 @@ function updateGaugeForPitch(freq) {
   const inTune = Math.abs(cents) <= IN_TUNE_THRESHOLD;
 
   setTuningState(noteName, cents, state.currentVolume, inTune);
-  updateGauge(cents, state.currentVolume);
   setActiveString(state.activeStringIndex, inTune);
 
   // Haptic feedback on entering in-tune zone
@@ -297,15 +291,15 @@ async function startTuner() {
     state.detector = detector;
     initReferenceTone(detector.audioContext);
     showApp();
-    setGaugeActive(true);
-    startAsciiTuner();
+    setTunerDisplayActive(true);
+    startTunerDisplay();
     requestWakeLock();
     updateGaugeForSilence();
   } catch (error) {
     detector.stop();
     state.detector = null;
-    stopAsciiTuner();
-    setGaugeActive(false);
+    stopTunerDisplay();
+    setTunerDisplayActive(false);
     releaseWakeLock();
     const message = getStartErrorMessage(error);
     showError(message.title, message.message);
@@ -383,9 +377,8 @@ function bindEvents() {
 }
 
 function init() {
-  initGauge(getElement('tuning-gauge'));
-  setGaugeActive(false);
-  initAsciiTuner(getElement('ascii-tuner'));
+  initTunerDisplay(getElement('tuner-display'));
+  setTunerDisplayActive(false);
   syncSelectedTuning(getLastTuningId());
   resetCustomTuningForm();
   bindEvents();
